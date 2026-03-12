@@ -1,8 +1,41 @@
 'use client';
 
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { motion, useInView, useMotionValue, useSpring, useTransform } from 'framer-motion';
 import AppImage from '@/components/ui/AppImage';
+
+type Variant = {
+  id: string;
+  name: string;
+  price: number;
+  stock: number;
+};
+
+type CheckoutForm = {
+  customerName: string;
+  mobileNumber: string;
+  email: string;
+  addressLine1: string;
+  addressLine2: string;
+  landmark: string;
+  city: string;
+  state: string;
+  pincode: string;
+};
+
+const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001/api';
+
+const initialCheckoutForm: CheckoutForm = {
+  customerName: '',
+  mobileNumber: '',
+  email: '',
+  addressLine1: '',
+  addressLine2: '',
+  landmark: '',
+  city: '',
+  state: '',
+  pincode: '',
+};
 
 const highlights = [
 { icon: '🌿', text: 'Natural Formula' },
@@ -18,6 +51,13 @@ export default function ProductShowcase() {
   const imageRef = useRef<HTMLDivElement>(null);
   const inView = useInView(ref, { once: true, margin: '-80px' });
   const [quantity, setQuantity] = useState(1);
+  const [variants, setVariants] = useState<Variant[]>([{ id: 'default-500ml', name: '500ml', price: 299, stock: 500 }]);
+  const [selectedVariantId, setSelectedVariantId] = useState('default-500ml');
+  const [isCartOpen, setIsCartOpen] = useState(false);
+  const [checkoutForm, setCheckoutForm] = useState<CheckoutForm>(initialCheckoutForm);
+  const [isSubmittingOrder, setIsSubmittingOrder] = useState(false);
+  const [checkoutError, setCheckoutError] = useState('');
+  const [checkoutSuccess, setCheckoutSuccess] = useState('');
 
   // 3D tilt effect
   const mouseX = useMotionValue(0);
@@ -39,7 +79,78 @@ export default function ProductShowcase() {
     mouseY.set(0);
   };
 
-  const totalPrice = 299 * quantity;
+  useEffect(() => {
+    async function loadVariants() {
+      try {
+        const response = await fetch(`${apiBaseUrl}/products/landing`);
+        const payload = await response.json();
+
+        if (!response.ok || !Array.isArray(payload?.data?.variants) || payload.data.variants.length === 0) {
+          return;
+        }
+
+        setVariants(payload.data.variants);
+        setSelectedVariantId(payload.data.variants[0].id);
+      } catch {
+        // Keep fallback variant for resilient landing-page rendering
+      }
+    }
+
+    loadVariants();
+  }, []);
+
+  const selectedVariant = variants.find((variant) => variant.id === selectedVariantId) || variants[0];
+  const selectedPrice = selectedVariant?.price || 299;
+
+  const totalPrice = selectedPrice * quantity;
+
+  function updateFormField(field: keyof CheckoutForm, value: string) {
+    setCheckoutForm((prev) => ({
+      ...prev,
+      [field]: value,
+    }));
+  }
+
+  async function handlePayNow(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (!selectedVariant) {
+      setCheckoutError('Selected variant not found');
+      return;
+    }
+
+    setIsSubmittingOrder(true);
+    setCheckoutError('');
+    setCheckoutSuccess('');
+
+    try {
+      const response = await fetch(`${apiBaseUrl}/orders`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          ...checkoutForm,
+          variantId: selectedVariant.id,
+          quantity,
+        }),
+      });
+
+      const payload = await response.json();
+
+      if (!response.ok) {
+        throw new Error(payload.message || 'Unable to create order');
+      }
+
+      setCheckoutSuccess(`Order created. Order ID: ${payload.data.orderId}`);
+      setCheckoutForm(initialCheckoutForm);
+      setQuantity(1);
+    } catch (error) {
+      setCheckoutError(error instanceof Error ? error.message : 'Unable to create order');
+    } finally {
+      setIsSubmittingOrder(false);
+    }
+  }
 
   return (
     <section
@@ -144,7 +255,7 @@ export default function ProductShowcase() {
 
               {/* Price */}
               <div className="flex items-baseline gap-4">
-                <span className="font-display text-5xl font-semibold text-foreground">₹299</span>
+                <span className="font-display text-5xl font-semibold text-foreground">₹{selectedPrice}</span>
                 <span className="text-muted line-through text-xl">₹499</span>
                 <span className="bg-primary text-white text-xs px-3 py-1.5 rounded-full font-semibold">
                   40% OFF
@@ -166,6 +277,22 @@ export default function ProductShowcase() {
 
               {/* Quantity */}
               <div>
+                <p className="text-sm font-semibold text-foreground mb-3">Variant</p>
+                <div className="mb-5">
+                  <select
+                    value={selectedVariantId}
+                    onChange={(event) => setSelectedVariantId(event.target.value)}
+                    className="w-full rounded-2xl border border-border bg-white px-4 py-3 text-sm font-medium text-foreground outline-none focus:border-primary"
+                    aria-label="Select product variant"
+                  >
+                    {variants.map((variant) => (
+                      <option key={variant.id} value={variant.id}>
+                        {variant.name} — ₹{variant.price} {variant.stock <= 0 ? '(Out of stock)' : `(${variant.stock} in stock)`}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
                 <p className="text-sm font-semibold text-foreground mb-3">Quantity</p>
                 <div className="flex items-center gap-4">
                   <div className="flex items-center border border-border rounded-2xl overflow-hidden bg-white">
@@ -196,10 +323,17 @@ export default function ProductShowcase() {
 
               {/* Buy button */}
               <button
+                type="button"
+                onClick={() => {
+                  setIsCartOpen(true);
+                  setCheckoutError('');
+                  setCheckoutSuccess('');
+                }}
+                disabled={!selectedVariant || selectedVariant.stock <= 0}
                 className="btn-primary w-full py-5 rounded-2xl font-semibold text-lg tracking-wide shadow-green-lg"
-                aria-label={`Buy ${quantity} Dr. Detoxer for ₹${totalPrice}`}>
+                aria-label={`Buy ${quantity} ${selectedVariant?.name || 'Dr. Detoxer'} for ₹${totalPrice}`}>
                 
-                Buy Now — ₹{totalPrice}
+                {selectedVariant && selectedVariant.stock > 0 ? `Buy Now — ₹${totalPrice}` : 'Out of Stock'}
               </button>
 
               {/* Trust micro-copy */}
@@ -218,6 +352,131 @@ export default function ProductShowcase() {
           </motion.div>
         </div>
       </div>
+
+      {isCartOpen ? (
+        <div className="fixed inset-0 z-50 bg-black/50" role="dialog" aria-modal="true" aria-label="Checkout cart">
+          <button
+            type="button"
+            aria-label="Close cart backdrop"
+            onClick={() => setIsCartOpen(false)}
+            className="absolute inset-0 h-full w-full cursor-default"
+          />
+
+          <aside className="absolute right-0 top-0 h-full w-full overflow-y-auto bg-white shadow-strong sm:max-w-xl">
+            <div className="sticky top-0 z-10 flex items-center justify-between border-b border-border bg-white px-5 py-4 sm:px-6">
+              <h3 className="font-display text-2xl text-foreground">Checkout Cart</h3>
+              <button
+                type="button"
+                onClick={() => setIsCartOpen(false)}
+                className="rounded-full border border-border px-4 py-2 text-sm font-semibold text-foreground"
+              >
+                Close
+              </button>
+            </div>
+
+            <div className="p-5 sm:p-6">
+              <div className="mb-6 rounded-2xl border border-border bg-surface p-4">
+                <p className="text-sm text-muted">Selected</p>
+                <p className="mt-1 text-base font-semibold text-foreground">{selectedVariant?.name} × {quantity}</p>
+                <p className="mt-1 text-base font-semibold text-foreground">Total: ₹{totalPrice}</p>
+              </div>
+
+              <form className="space-y-4" onSubmit={handlePayNow}>
+                <input
+                  type="text"
+                  value={checkoutForm.customerName}
+                  onChange={(event) => updateFormField('customerName', event.target.value)}
+                  className="w-full rounded-2xl border border-border bg-white px-4 py-3 text-sm text-foreground outline-none focus:border-primary"
+                  placeholder="Full Name"
+                  required
+                />
+
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <input
+                    type="tel"
+                    value={checkoutForm.mobileNumber}
+                    onChange={(event) => updateFormField('mobileNumber', event.target.value.replace(/[^0-9]/g, '').slice(0, 10))}
+                    className="w-full rounded-2xl border border-border bg-white px-4 py-3 text-sm text-foreground outline-none focus:border-primary"
+                    placeholder="Mobile Number (10 digits)"
+                    required
+                  />
+                  <input
+                    type="email"
+                    value={checkoutForm.email}
+                    onChange={(event) => updateFormField('email', event.target.value)}
+                    className="w-full rounded-2xl border border-border bg-white px-4 py-3 text-sm text-foreground outline-none focus:border-primary"
+                    placeholder="Email ID"
+                    required
+                  />
+                </div>
+
+                <input
+                  type="text"
+                  value={checkoutForm.addressLine1}
+                  onChange={(event) => updateFormField('addressLine1', event.target.value)}
+                  className="w-full rounded-2xl border border-border bg-white px-4 py-3 text-sm text-foreground outline-none focus:border-primary"
+                  placeholder="House No, Building, Street, Area"
+                  required
+                />
+
+                <input
+                  type="text"
+                  value={checkoutForm.addressLine2}
+                  onChange={(event) => updateFormField('addressLine2', event.target.value)}
+                  className="w-full rounded-2xl border border-border bg-white px-4 py-3 text-sm text-foreground outline-none focus:border-primary"
+                  placeholder="Apartment, Floor (optional)"
+                />
+
+                <input
+                  type="text"
+                  value={checkoutForm.landmark}
+                  onChange={(event) => updateFormField('landmark', event.target.value)}
+                  className="w-full rounded-2xl border border-border bg-white px-4 py-3 text-sm text-foreground outline-none focus:border-primary"
+                  placeholder="Landmark (optional)"
+                />
+
+                <div className="grid gap-4 sm:grid-cols-3">
+                  <input
+                    type="text"
+                    value={checkoutForm.city}
+                    onChange={(event) => updateFormField('city', event.target.value)}
+                    className="w-full rounded-2xl border border-border bg-white px-4 py-3 text-sm text-foreground outline-none focus:border-primary"
+                    placeholder="City"
+                    required
+                  />
+                  <input
+                    type="text"
+                    value={checkoutForm.state}
+                    onChange={(event) => updateFormField('state', event.target.value)}
+                    className="w-full rounded-2xl border border-border bg-white px-4 py-3 text-sm text-foreground outline-none focus:border-primary"
+                    placeholder="State"
+                    required
+                  />
+                  <input
+                    type="text"
+                    value={checkoutForm.pincode}
+                    onChange={(event) => updateFormField('pincode', event.target.value.replace(/[^0-9]/g, '').slice(0, 6))}
+                    className="w-full rounded-2xl border border-border bg-white px-4 py-3 text-sm text-foreground outline-none focus:border-primary"
+                    placeholder="Pincode"
+                    required
+                  />
+                </div>
+
+                {checkoutError ? <p className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm font-medium text-red-700">{checkoutError}</p> : null}
+                {checkoutSuccess ? <p className="rounded-xl border border-green-200 bg-green-50 px-3 py-2 text-sm font-medium text-green-700">{checkoutSuccess}</p> : null}
+
+                <button
+                  type="submit"
+                  disabled={isSubmittingOrder}
+                  className="btn-primary w-full py-4 rounded-2xl font-semibold text-base tracking-wide disabled:cursor-not-allowed disabled:opacity-70"
+                >
+                  {isSubmittingOrder ? 'Processing...' : `Pay Now — ₹${totalPrice}`}
+                </button>
+              </form>
+            </div>
+          </aside>
+        </div>
+      ) : null}
     </section>);
 
 }
