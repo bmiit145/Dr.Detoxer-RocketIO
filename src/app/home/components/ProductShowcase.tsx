@@ -23,6 +23,12 @@ type CheckoutForm = {
   pincode: string;
 };
 
+type OrderReceipt = {
+  orderId: string;
+  orderNumber: string;
+  amount: number;
+};
+
 const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001/api';
 const checkoutStorageKey = 'drdetoxer_checkout_profile_v1';
 
@@ -80,6 +86,7 @@ const highlights = [
 export default function ProductShowcase() {
   const ref = useRef(null);
   const imageRef = useRef<HTMLDivElement>(null);
+  const submitLockRef = useRef(false);
   const inView = useInView(ref, { once: true, margin: '-80px' });
   const [quantity, setQuantity] = useState(1);
   const [variants, setVariants] = useState<Variant[]>([{ id: 'default-500ml', name: '500ml', price: 299, stock: 500 }]);
@@ -88,7 +95,7 @@ export default function ProductShowcase() {
   const [checkoutForm, setCheckoutForm] = useState<CheckoutForm>(initialCheckoutForm);
   const [isSubmittingOrder, setIsSubmittingOrder] = useState(false);
   const [checkoutError, setCheckoutError] = useState('');
-  const [checkoutSuccess, setCheckoutSuccess] = useState('');
+  const [orderReceipt, setOrderReceipt] = useState<OrderReceipt | null>(null);
 
   // 3D tilt effect
   const mouseX = useMotionValue(0);
@@ -158,14 +165,20 @@ export default function ProductShowcase() {
   async function handlePayNow(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
+    if (submitLockRef.current || isSubmittingOrder || orderReceipt) {
+      return;
+    }
+
     if (!selectedVariant) {
       setCheckoutError('Selected variant not found');
       return;
     }
 
+    submitLockRef.current = true;
+
     setIsSubmittingOrder(true);
     setCheckoutError('');
-    setCheckoutSuccess('');
+    setOrderReceipt(null);
 
     try {
       const response = await fetch(`${apiBaseUrl}/orders`, {
@@ -186,12 +199,17 @@ export default function ProductShowcase() {
         throw new Error(payload.message || 'Unable to create order');
       }
 
-      setCheckoutSuccess(`Order created. Order Number: ${payload.data.orderNumber || payload.data.orderId}`);
+      setOrderReceipt({
+        orderId: String(payload.data.orderId),
+        orderNumber: String(payload.data.orderNumber || payload.data.orderId),
+        amount: Number(payload.data.amount || totalPrice),
+      });
       setQuantity(1);
     } catch (error) {
       setCheckoutError(error instanceof Error ? error.message : 'Unable to create order');
     } finally {
       setIsSubmittingOrder(false);
+      submitLockRef.current = false;
     }
   }
 
@@ -370,7 +388,7 @@ export default function ProductShowcase() {
                 onClick={() => {
                   setIsCartOpen(true);
                   setCheckoutError('');
-                  setCheckoutSuccess('');
+                  setOrderReceipt(null);
                 }}
                 disabled={!selectedVariant || selectedVariant.stock <= 0}
                 className="btn-primary w-full py-5 rounded-2xl font-semibold text-lg tracking-wide shadow-green-lg"
@@ -514,14 +532,63 @@ export default function ProductShowcase() {
                 </div>
 
                 {checkoutError ? <p className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm font-medium text-red-700">{checkoutError}</p> : null}
-                {checkoutSuccess ? <p className="rounded-xl border border-green-200 bg-green-50 px-3 py-2 text-sm font-medium text-green-700">{checkoutSuccess}</p> : null}
+
+                {orderReceipt ? (
+                  <motion.div
+                    initial={{ opacity: 0, y: 16, scale: 0.96 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    transition={{ duration: 0.35 }}
+                    className="rounded-2xl border border-green-200 bg-green-50 p-4"
+                  >
+                    <div className="mb-3 flex items-center gap-3">
+                      <motion.div
+                        initial={{ scale: 0.8 }}
+                        animate={{ scale: [1, 1.08, 1] }}
+                        transition={{ duration: 0.6 }}
+                        className="flex h-10 w-10 items-center justify-center rounded-full bg-green-600 text-lg text-white"
+                      >
+                        ✓
+                      </motion.div>
+                      <div>
+                        <p className="text-sm font-semibold text-green-800">Order placed successfully</p>
+                        <p className="text-xs text-green-700">Order Number: {orderReceipt.orderNumber}</p>
+                      </div>
+                    </div>
+
+                    <p className="text-sm text-green-800">Amount: ₹{orderReceipt.amount}</p>
+
+                    <div className="mt-3 flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (typeof window !== 'undefined') {
+                            window.location.href = `/home/track-order?type=order&query=${encodeURIComponent(orderReceipt.orderNumber)}`;
+                          }
+                        }}
+                        className="rounded-xl border border-green-700 bg-white px-3 py-2 text-xs font-semibold text-green-800"
+                      >
+                        Track Order
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setOrderReceipt(null);
+                          setCheckoutError('');
+                        }}
+                        className="rounded-xl border border-green-200 bg-green-100 px-3 py-2 text-xs font-semibold text-green-800"
+                      >
+                        Place Another
+                      </button>
+                    </div>
+                  </motion.div>
+                ) : null}
 
                 <button
                   type="submit"
-                  disabled={isSubmittingOrder}
+                  disabled={isSubmittingOrder || Boolean(orderReceipt)}
                   className="btn-primary w-full py-4 rounded-2xl font-semibold text-base tracking-wide disabled:cursor-not-allowed disabled:opacity-70"
                 >
-                  {isSubmittingOrder ? 'Processing...' : `Pay Now — ₹${totalPrice}`}
+                  {isSubmittingOrder ? 'Processing...' : orderReceipt ? 'Order Placed' : `Pay Now — ₹${totalPrice}`}
                 </button>
               </form>
             </div>
