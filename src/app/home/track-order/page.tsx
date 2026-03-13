@@ -1,6 +1,6 @@
 'use client';
 
-import { FormEvent, useEffect, useMemo, useState } from 'react';
+import { FormEvent, Suspense, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
@@ -40,9 +40,10 @@ type PaginationMeta = {
 
 const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001/api';
 
-const trackingStageOrder = ['order_placed', 'confirmed', 'packed', 'shipped', 'out_for_delivery', 'delivered'];
+const trackingStageOrder = ['awaiting_payment', 'order_placed', 'confirmed', 'packed', 'shipped', 'out_for_delivery', 'delivered'];
 
 const trackingStatusLabel: Record<string, string> = {
+  awaiting_payment: 'Awaiting Payment',
   order_placed: 'Order Placed',
   confirmed: 'Confirmed',
   packed: 'Packed',
@@ -52,7 +53,7 @@ const trackingStatusLabel: Record<string, string> = {
   cancelled: 'Cancelled',
 };
 
-export default function TrackOrderPage() {
+function TrackOrderPageContent() {
   const searchParams = useSearchParams();
   const [trackingType, setTrackingType] = useState<TrackingType>('order');
   const [queryInput, setQueryInput] = useState('');
@@ -253,6 +254,7 @@ export default function TrackOrderPage() {
                         <p className="text-sm text-foreground"><span className="text-muted">Mobile:</span> {order.mobileNumber}</p>
                         <p className="text-sm text-foreground"><span className="text-muted">Email:</span> {order.email}</p>
                         <p className="text-sm text-foreground"><span className="text-muted">Amount:</span> ₹{formatCurrency(order.totalAmount)}</p>
+                        <p className="text-sm text-foreground"><span className="text-muted">Payment:</span> {order.paymentStatus}</p>
                       </div>
 
                       <div className="mt-5">
@@ -319,5 +321,13 @@ export default function TrackOrderPage() {
       </main>
       <Footer />
     </>
+  );
+}
+
+export default function TrackOrderPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-surface pt-28" />}>
+      <TrackOrderPageContent />
+    </Suspense>
   );
 }

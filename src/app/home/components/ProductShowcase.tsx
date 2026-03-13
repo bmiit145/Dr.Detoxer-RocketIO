@@ -29,6 +29,25 @@ type OrderReceipt = {
   amount: number;
 };
 
+type PaymentSession = {
+  orderId: string;
+  orderNumber: string;
+  amount: number;
+  amountPaise: number;
+  currency: string;
+  razorpayOrderId: string;
+  razorpayKeyId: string;
+};
+
+declare global {
+  interface Window {
+    Razorpay?: new (options: Record<string, unknown>) => {
+      open: () => void;
+      on: (event: string, callback: (response: { error?: { description?: string } }) => void) => void;
+    };
+  }
+}
+
 const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001/api';
 const checkoutStorageKey = 'drdetoxer_checkout_profile_v1';
 
@@ -72,6 +91,34 @@ function getStoredCheckoutForm(): CheckoutForm | null {
   } catch {
     return null;
   }
+}
+
+function loadRazorpayScript() {
+  if (typeof window === 'undefined') {
+    return Promise.resolve(false);
+  }
+
+  if (window.Razorpay) {
+    return Promise.resolve(true);
+  }
+
+  return new Promise<boolean>((resolve) => {
+    const existingScript = document.querySelector('script[data-razorpay-checkout="true"]') as HTMLScriptElement | null;
+
+    if (existingScript) {
+      existingScript.addEventListener('load', () => resolve(true), { once: true });
+      existingScript.addEventListener('error', () => resolve(false), { once: true });
+      return;
+    }
+
+    const script = document.createElement('script');
+    script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+    script.async = true;
+    script.dataset.razorpayCheckout = 'true';
+    script.onload = () => resolve(true);
+    script.onerror = () => resolve(false);
+    document.body.appendChild(script);
+  });
 }
 
 const highlights = [
@@ -142,6 +189,38 @@ export default function ProductShowcase() {
 
     if (storedCheckoutForm) {
       setCheckoutForm(storedCheckoutForm);
+
+      // State recovery: Check if there's a recently paid order that matches this mobile number
+      // We check for orders created in the last 15 minutes
+      if (storedCheckoutForm.mobileNumber) {
+        const recoverState = async () => {
+          try {
+            const res = await fetch(`${apiBaseUrl}/orders/track?type=phone&query=${storedCheckoutForm.mobileNumber}&limit=1`);
+            const payload = await res.json();
+            const latestOrder = payload?.data?.items?.[0];
+
+            if (latestOrder && latestOrder.paymentStatus === 'paid') {
+              const orderTime = new Date(latestOrder.createdAt).getTime();
+              const now = new Date().getTime();
+              const fifteenMinutes = 15 * 60 * 1000;
+
+              if (now - orderTime < fifteenMinutes) {
+                // If the user is not already looking at a successful order receipt, show this one
+                setOrderReceipt({
+                  orderId: latestOrder.id,
+                  orderNumber: latestOrder.orderNumber,
+                  amount: latestOrder.totalAmount,
+                });
+                setIsCartOpen(true);
+              }
+            }
+          } catch {
+            // Passive recovery fail is fine
+          }
+        };
+
+        recoverState();
+      }
     }
   }, []);
 
@@ -180,7 +259,15 @@ export default function ProductShowcase() {
     setCheckoutError('');
     setOrderReceipt(null);
 
+    let shouldReleaseLock = true;
+
     try {
+      const scriptLoaded = await loadRazorpayScript();
+
+      if (!scriptLoaded || !window.Razorpay) {
+        throw new Error('Unable to load Razorpay checkout. Please try again.');
+      }
+
       const response = await fetch(`${apiBaseUrl}/orders`, {
         method: 'POST',
         headers: {
@@ -199,17 +286,95 @@ export default function ProductShowcase() {
         throw new Error(payload.message || 'Unable to create order');
       }
 
-      setOrderReceipt({
+      const paymentSession: PaymentSession = {
         orderId: String(payload.data.orderId),
         orderNumber: String(payload.data.orderNumber || payload.data.orderId),
         amount: Number(payload.data.amount || totalPrice),
+        amountPaise: Number(payload.data.amountPaise || totalPrice * 100),
+        currency: String(payload.data.currency || 'INR'),
+        razorpayOrderId: String(payload.data.razorpayOrderId || ''),
+        razorpayKeyId: String(payload.data.razorpayKeyId || ''),
+      };
+
+      const razorpay = new window.Razorpay({
+        key: paymentSession.razorpayKeyId,
+        amount: paymentSession.amountPaise,
+        currency: paymentSession.currency,
+        name: 'Dr. Detoxer',
+        description: `Order ${paymentSession.orderNumber}`,
+        order_id: paymentSession.razorpayOrderId,
+        prefill: {
+          name: checkoutForm.customerName,
+          email: checkoutForm.email,
+          contact: checkoutForm.mobileNumber,
+        },
+        notes: {
+          localOrderId: paymentSession.orderId,
+          orderNumber: paymentSession.orderNumber,
+        },
+        theme: {
+          color: '#2d6b4f',
+        },
+        modal: {
+          ondismiss: () => {
+            setCheckoutError('Payment was cancelled before completion.');
+            setIsSubmittingOrder(false);
+            submitLockRef.current = false;
+          },
+        },
+        handler: async (paymentResponse: {
+          razorpay_payment_id: string;
+          razorpay_order_id: string;
+          razorpay_signature: string;
+        }) => {
+          try {
+            const verifyResponse = await fetch(`${apiBaseUrl}/orders/verify-payment`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                localOrderId: paymentSession.orderId,
+                ...paymentResponse,
+              }),
+            });
+
+            const verifyPayload = await verifyResponse.json();
+
+            if (!verifyResponse.ok) {
+              throw new Error(verifyPayload.message || 'Payment verification failed');
+            }
+
+            setOrderReceipt({
+              orderId: String(verifyPayload.data.orderId),
+              orderNumber: String(verifyPayload.data.orderNumber || paymentSession.orderNumber),
+              amount: Number(verifyPayload.data.amount || paymentSession.amount),
+            });
+            setQuantity(1);
+          } catch (error) {
+            setCheckoutError(error instanceof Error ? error.message : 'Payment verification failed');
+          } finally {
+            setIsSubmittingOrder(false);
+            submitLockRef.current = false;
+          }
+        },
       });
-      setQuantity(1);
+
+      razorpay.on('payment.failed', (failureResponse) => {
+        setCheckoutError(failureResponse?.error?.description || 'Payment failed. Please try again.');
+        setIsSubmittingOrder(false);
+        submitLockRef.current = false;
+      });
+
+      shouldReleaseLock = false;
+      razorpay.open();
     } catch (error) {
       setCheckoutError(error instanceof Error ? error.message : 'Unable to create order');
     } finally {
-      setIsSubmittingOrder(false);
-      submitLockRef.current = false;
+      if (shouldReleaseLock) {
+        setIsSubmittingOrder(false);
+        submitLockRef.current = false;
+      }
     }
   }
 
