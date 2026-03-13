@@ -1,6 +1,7 @@
 'use client';
 
-import { FormEvent, useMemo, useState } from 'react';
+import { FormEvent, useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 
@@ -52,6 +53,7 @@ const trackingStatusLabel: Record<string, string> = {
 };
 
 export default function TrackOrderPage() {
+  const searchParams = useSearchParams();
   const [trackingType, setTrackingType] = useState<TrackingType>('order');
   const [queryInput, setQueryInput] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
@@ -76,13 +78,40 @@ export default function TrackOrderPage() {
     return new Intl.NumberFormat('en-IN').format(value || 0);
   }
 
-  function normalizeTrackingQuery(value: string) {
-    if (trackingType === 'phone') {
+  function normalizeTrackingQuery(value: string, type: TrackingType = trackingType) {
+    if (type === 'phone') {
       return value.replace(/\D/g, '').slice(-10);
     }
 
     return value.trim();
   }
+
+  useEffect(() => {
+    const paramType = String(searchParams.get('type') || '').toLowerCase();
+    const paramQuery = String(searchParams.get('query') || '');
+
+    if (!paramQuery) {
+      return;
+    }
+
+    const resolvedType: TrackingType = paramType === 'phone' || paramType === 'email' || paramType === 'order' ? paramType : 'order';
+    const normalizedQuery = normalizeTrackingQuery(paramQuery, resolvedType);
+
+    if (!normalizedQuery) {
+      return;
+    }
+
+    setTrackingType(resolvedType);
+    setQueryInput(normalizedQuery);
+    setSearchQuery(normalizedQuery);
+    setErrorMessage('');
+
+    loadTrackingOrders(resolvedType, normalizedQuery, 1).catch((error) => {
+      setOrders([]);
+      setPagination({ page: 1, limit: 10, totalItems: 0, totalPages: 0 });
+      setErrorMessage(error instanceof Error ? error.message : 'Unable to track order');
+    });
+  }, [searchParams]);
 
   async function loadTrackingOrders(type: TrackingType, query: string, page = 1) {
     setIsLoading(true);
