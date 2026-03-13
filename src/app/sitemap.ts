@@ -20,5 +20,11 @@ export default function sitemap(): MetadataRoute.Sitemap {
       changeFrequency: 'monthly',
       priority: 0.5,
     },
+    {
+      url: `${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/home/track-order`,
+      lastModified: new Date('2026-03-13'),
+      changeFrequency: 'weekly',
+      priority: 0.7,
+    },
   ];
 }

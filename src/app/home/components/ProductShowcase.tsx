@@ -138,24 +138,21 @@ export default function ProductShowcase() {
     }
   }, []);
 
-  useEffect(() => {
-    if (typeof window === 'undefined') {
-      return;
-    }
-
-    window.localStorage.setItem(checkoutStorageKey, JSON.stringify(checkoutForm));
-  }, [checkoutForm]);
-
   const selectedVariant = variants.find((variant) => variant.id === selectedVariantId) || variants[0];
   const selectedPrice = selectedVariant?.price || 299;
 
   const totalPrice = selectedPrice * quantity;
 
   function updateFormField(field: keyof CheckoutForm, value: string) {
-    setCheckoutForm((prev) => ({
-      ...prev,
-      [field]: value,
-    }));
+    setCheckoutForm((prev) => {
+      const next = { ...prev, [field]: value };
+
+      if (typeof window !== 'undefined') {
+        window.localStorage.setItem(checkoutStorageKey, JSON.stringify(next));
+      }
+
+      return next;
+    });
   }
 
   async function handlePayNow(event: React.FormEvent<HTMLFormElement>) {
@@ -189,7 +186,7 @@ export default function ProductShowcase() {
         throw new Error(payload.message || 'Unable to create order');
       }
 
-      setCheckoutSuccess(`Order created. Order ID: ${payload.data.orderId}`);
+      setCheckoutSuccess(`Order created. Order Number: ${payload.data.orderNumber || payload.data.orderId}`);
       setQuantity(1);
     } catch (error) {
       setCheckoutError(error instanceof Error ? error.message : 'Unable to create order');

@@ -6,9 +6,10 @@ import AppLogo from '@/components/ui/AppLogo';
 import Link from 'next/link';
 
 const navLinks = [
-  { label: 'Benefits', href: '#benefits' },
-  { label: 'Ingredients', href: '#ingredients' },
-  { label: 'How It Works', href: '#how-it-works' },
+  { label: 'Benefits', href: '/home#benefits' },
+  { label: 'Ingredients', href: '/home#ingredients' },
+  { label: 'How It Works', href: '/home#how-it-works' },
+  { label: 'Track Order', href: '/home/track-order' },
 ];
 
 export default function Header() {
@@ -51,15 +52,25 @@ export default function Header() {
 
         {/* Desktop nav */}
         <div className="hidden md:flex items-center gap-8">
-          {navLinks?.map((link) => (
-            <a
-              key={link?.label}
-              href={link?.href}
-              className="text-sm font-medium text-muted hover:text-foreground transition-colors duration-200"
-            >
-              {link?.label}
-            </a>
-          ))}
+          {navLinks?.map((link) =>
+            link.href.startsWith('/') ? (
+              <Link
+                key={link?.label}
+                href={link?.href}
+                className="text-sm font-medium text-muted hover:text-foreground transition-colors duration-200"
+              >
+                {link?.label}
+              </Link>
+            ) : (
+              <a
+                key={link?.label}
+                href={link?.href}
+                className="text-sm font-medium text-muted hover:text-foreground transition-colors duration-200"
+              >
+                {link?.label}
+              </a>
+            )
+          )}
         </div>
 
         {/* CTA */}
@@ -99,16 +110,27 @@ export default function Header() {
           animate={{ opacity: 1, height: 'auto' }}
           exit={{ opacity: 0, height: 0 }}
         >
-          {navLinks?.map((link) => (
-            <a
-              key={link?.label}
-              href={link?.href}
-              className="block text-base font-medium text-muted hover:text-foreground py-2"
-              onClick={() => setMenuOpen(false)}
-            >
-              {link?.label}
-            </a>
-          ))}
+          {navLinks?.map((link) =>
+            link.href.startsWith('/') ? (
+              <Link
+                key={link?.label}
+                href={link?.href}
+                className="block text-base font-medium text-muted hover:text-foreground py-2"
+                onClick={() => setMenuOpen(false)}
+              >
+                {link?.label}
+              </Link>
+            ) : (
+              <a
+                key={link?.label}
+                href={link?.href}
+                className="block text-base font-medium text-muted hover:text-foreground py-2"
+                onClick={() => setMenuOpen(false)}
+              >
+                {link?.label}
+              </a>
+            )
+          )}
           <button
             onClick={handleBuyNow}
             className="btn-primary w-full py-4 rounded-xl font-semibold"
