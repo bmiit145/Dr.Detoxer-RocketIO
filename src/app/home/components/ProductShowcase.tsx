@@ -24,6 +24,7 @@ type CheckoutForm = {
 };
 
 const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001/api';
+const checkoutStorageKey = 'drdetoxer_checkout_profile_v1';
 
 const initialCheckoutForm: CheckoutForm = {
   customerName: '',
@@ -36,6 +37,36 @@ const initialCheckoutForm: CheckoutForm = {
   state: '',
   pincode: '',
 };
+
+function getStoredCheckoutForm(): CheckoutForm | null {
+  if (typeof window === 'undefined') {
+    return null;
+  }
+
+  try {
+    const raw = window.localStorage.getItem(checkoutStorageKey);
+
+    if (!raw) {
+      return null;
+    }
+
+    const parsed = JSON.parse(raw) as Partial<CheckoutForm>;
+
+    return {
+      customerName: typeof parsed.customerName === 'string' ? parsed.customerName : '',
+      mobileNumber: typeof parsed.mobileNumber === 'string' ? parsed.mobileNumber : '',
+      email: typeof parsed.email === 'string' ? parsed.email : '',
+      addressLine1: typeof parsed.addressLine1 === 'string' ? parsed.addressLine1 : '',
+      addressLine2: typeof parsed.addressLine2 === 'string' ? parsed.addressLine2 : '',
+      landmark: typeof parsed.landmark === 'string' ? parsed.landmark : '',
+      city: typeof parsed.city === 'string' ? parsed.city : '',
+      state: typeof parsed.state === 'string' ? parsed.state : '',
+      pincode: typeof parsed.pincode === 'string' ? parsed.pincode : '',
+    };
+  } catch {
+    return null;
+  }
+}
 
 const highlights = [
 { icon: '🌿', text: 'Natural Formula' },
@@ -99,6 +130,22 @@ export default function ProductShowcase() {
     loadVariants();
   }, []);
 
+  useEffect(() => {
+    const storedCheckoutForm = getStoredCheckoutForm();
+
+    if (storedCheckoutForm) {
+      setCheckoutForm(storedCheckoutForm);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    window.localStorage.setItem(checkoutStorageKey, JSON.stringify(checkoutForm));
+  }, [checkoutForm]);
+
   const selectedVariant = variants.find((variant) => variant.id === selectedVariantId) || variants[0];
   const selectedPrice = selectedVariant?.price || 299;
 
@@ -143,7 +190,6 @@ export default function ProductShowcase() {
       }
 
       setCheckoutSuccess(`Order created. Order ID: ${payload.data.orderId}`);
-      setCheckoutForm(initialCheckoutForm);
       setQuantity(1);
     } catch (error) {
       setCheckoutError(error instanceof Error ? error.message : 'Unable to create order');
@@ -386,6 +432,7 @@ export default function ProductShowcase() {
                   type="text"
                   value={checkoutForm.customerName}
                   onChange={(event) => updateFormField('customerName', event.target.value)}
+                  autoComplete="name"
                   className="w-full rounded-2xl border border-border bg-white px-4 py-3 text-sm text-foreground outline-none focus:border-primary"
                   placeholder="Full Name"
                   required
@@ -396,6 +443,7 @@ export default function ProductShowcase() {
                     type="tel"
                     value={checkoutForm.mobileNumber}
                     onChange={(event) => updateFormField('mobileNumber', event.target.value.replace(/[^0-9]/g, '').slice(0, 10))}
+                    autoComplete="tel-national"
                     className="w-full rounded-2xl border border-border bg-white px-4 py-3 text-sm text-foreground outline-none focus:border-primary"
                     placeholder="Mobile Number (10 digits)"
                     required
@@ -404,6 +452,7 @@ export default function ProductShowcase() {
                     type="email"
                     value={checkoutForm.email}
                     onChange={(event) => updateFormField('email', event.target.value)}
+                    autoComplete="email"
                     className="w-full rounded-2xl border border-border bg-white px-4 py-3 text-sm text-foreground outline-none focus:border-primary"
                     placeholder="Email ID"
                     required
@@ -414,6 +463,7 @@ export default function ProductShowcase() {
                   type="text"
                   value={checkoutForm.addressLine1}
                   onChange={(event) => updateFormField('addressLine1', event.target.value)}
+                  autoComplete="address-line1"
                   className="w-full rounded-2xl border border-border bg-white px-4 py-3 text-sm text-foreground outline-none focus:border-primary"
                   placeholder="House No, Building, Street, Area"
                   required
@@ -423,6 +473,7 @@ export default function ProductShowcase() {
                   type="text"
                   value={checkoutForm.addressLine2}
                   onChange={(event) => updateFormField('addressLine2', event.target.value)}
+                  autoComplete="address-line2"
                   className="w-full rounded-2xl border border-border bg-white px-4 py-3 text-sm text-foreground outline-none focus:border-primary"
                   placeholder="Apartment, Floor (optional)"
                 />
@@ -440,6 +491,7 @@ export default function ProductShowcase() {
                     type="text"
                     value={checkoutForm.city}
                     onChange={(event) => updateFormField('city', event.target.value)}
+                    autoComplete="address-level2"
                     className="w-full rounded-2xl border border-border bg-white px-4 py-3 text-sm text-foreground outline-none focus:border-primary"
                     placeholder="City"
                     required
@@ -448,6 +500,7 @@ export default function ProductShowcase() {
                     type="text"
                     value={checkoutForm.state}
                     onChange={(event) => updateFormField('state', event.target.value)}
+                    autoComplete="address-level1"
                     className="w-full rounded-2xl border border-border bg-white px-4 py-3 text-sm text-foreground outline-none focus:border-primary"
                     placeholder="State"
                     required
@@ -456,6 +509,7 @@ export default function ProductShowcase() {
                     type="text"
                     value={checkoutForm.pincode}
                     onChange={(event) => updateFormField('pincode', event.target.value.replace(/[^0-9]/g, '').slice(0, 6))}
+                    autoComplete="postal-code"
                     className="w-full rounded-2xl border border-border bg-white px-4 py-3 text-sm text-foreground outline-none focus:border-primary"
                     placeholder="Pincode"
                     required
