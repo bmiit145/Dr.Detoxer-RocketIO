@@ -103,8 +103,7 @@ export default function ProblemStory() {
                 alt="Fresh vegetables and fruits that appear clean but may contain pesticides and bacteria"
                 width={900}
                 height={560}
-                className="w-full object-cover"
-                style={{ height: '420px' }} />
+                className="w-full h-auto aspect-[16/10] lg:aspect-video object-cover" />
               
               {/* Dark overlay with text */}
               <div className="absolute inset-0 bg-gradient-to-t from-foreground/80 via-foreground/20 to-transparent flex items-end p-8">
@@ -119,7 +118,7 @@ export default function ProblemStory() {
 
             {/* Floating stat */}
             <motion.div
-              className="absolute -top-6 -right-4 lg:-right-8 glass px-6 py-4 rounded-3xl shadow-medium"
+              className="absolute -top-6 right-0 lg:-right-8 glass px-6 py-4 rounded-3xl shadow-medium"
               animate={{ y: [0, -8, 0] }}
               transition={{ duration: 5, repeat: Infinity, ease: 'easeInOut' }}>
               

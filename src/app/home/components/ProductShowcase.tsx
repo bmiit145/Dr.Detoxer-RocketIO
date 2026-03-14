@@ -382,7 +382,7 @@ export default function ProductShowcase() {
     <section
       id="product"
       ref={ref}
-      className="py-32 lg:py-40 bg-surface"
+      className="py-32 lg:py-40 bg-surface overflow-hidden"
       aria-labelledby="product-heading">
       
       <div className="max-w-7xl mx-auto px-6 lg:px-12">
@@ -430,8 +430,7 @@ export default function ProductShowcase() {
                   alt="Dr. Detoxer 500ml vegetable and fruit wash liquid bottle — complete product view"
                   width={700}
                   height={700}
-                  className="w-full object-cover"
-                  style={{ height: '520px' }} />
+                  className="w-full h-auto aspect-square object-cover" />
                 
                 {/* Shine overlay */}
                 <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/10 to-white/20 pointer-events-none" />
@@ -439,7 +438,7 @@ export default function ProductShowcase() {
 
               {/* Floating badges */}
               <motion.div
-                className="absolute -top-4 -right-4 glass px-5 py-3 rounded-3xl shadow-medium text-center"
+                className="absolute -top-4 right-0 lg:-right-4 glass px-5 py-3 rounded-3xl shadow-medium text-center"
                 animate={{ y: [0, -8, 0] }}
                 transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut' }}>
                 
@@ -489,7 +488,7 @@ export default function ProductShowcase() {
               </div>
 
               {/* Highlights */}
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {highlights.map((h) =>
                 <div
                   key={h.text}

@@ -57,7 +57,7 @@ export default function HeroSection() {
         aria-hidden="true">
         
         <span
-          className="font-display font-light italic text-primary-50 opacity-30"
+          className="hidden md:block font-display font-light italic text-primary-50 opacity-30"
           style={{ fontSize: 'clamp(8rem, 25vw, 22rem)', lineHeight: 0.85 }}>
           
           DETOX
@@ -196,20 +196,19 @@ export default function HeroSection() {
                 width={480}
                 height={560}
                 priority
-                className="object-cover rounded-5xl shadow-green-lg"
-                style={{ maxHeight: '560px' }} />
+                className="w-full h-auto object-contain rounded-5xl shadow-green-lg" />
               
 
               {/* Floating ingredient pills */}
               <motion.div
-                className="absolute -left-8 top-1/4 glass px-4 py-2.5 rounded-2xl shadow-medium"
+                className="absolute left-2 lg:left-0 top-1/4 glass px-4 py-2.5 rounded-2xl shadow-medium"
                 animate={{ y: [0, -8, 0] }}
                 transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut' }}>
                 
                 <p className="text-xs font-semibold text-primary">🌿 Neem Extract</p>
               </motion.div>
               <motion.div
-                className="absolute -right-6 top-1/2 glass px-4 py-2.5 rounded-2xl shadow-medium"
+                className="absolute right-2 lg:right-0 top-1/2 glass px-4 py-2.5 rounded-2xl shadow-medium"
                 animate={{ y: [0, 8, 0] }}
                 transition={{ duration: 5, repeat: Infinity, ease: 'easeInOut', delay: 1 }}>
                 

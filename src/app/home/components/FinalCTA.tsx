@@ -150,8 +150,7 @@ export default function FinalCTA() {
                   alt="Dr. Detoxer vegetable and fruit wash liquid — buy now and protect your family"
                   width={500}
                   height={580}
-                  className="object-cover rounded-5xl shadow-green-lg"
-                  style={{ maxHeight: '520px' }} />
+                  className="w-full h-auto object-cover rounded-5xl shadow-green-lg" />
                 
               </motion.div>
             </div>

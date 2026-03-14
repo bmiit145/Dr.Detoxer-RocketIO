@@ -22,7 +22,7 @@ export default function Footer() {
           </div>
 
           {/* Right: Links */}
-          <div className="flex flex-wrap gap-x-10 gap-y-3">
+          <div className="flex flex-wrap gap-x-6 gap-y-2 lg:gap-x-10 mt-4 lg:mt-0">
             {[
               { label: 'Benefits', href: '#benefits' },
               { label: 'Ingredients', href: '#ingredients' },

@@ -54,7 +54,7 @@ export default function IngredientsSection() {
     <section
       id="ingredients"
       ref={ref}
-      className="py-32 lg:py-40 bg-surface"
+      className="py-32 lg:py-40 bg-surface overflow-hidden"
       aria-labelledby="ingredients-heading">
       <div className="max-w-7xl mx-auto px-6 lg:px-12">
         {/* Header */}
